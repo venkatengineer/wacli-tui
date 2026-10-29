@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """
-wacli-tui: Alien-Themed WhatsApp Terminal User Interface
-An extraterrestrial, keyboard-navigable terminal client for WhatsApp powered by wacli.
+wacli-tui: Alien Weyland-Yutani Sci-Fi WhatsApp Terminal User Interface
+An eye-friendly extraterrestrial terminal client with multimedia support for WhatsApp powered by wacli.
 
 Features:
-- Extraterrestrial Sci-Fi / Cyberpunk Neon Alien Aesthetic
-- Full keyboard navigation (Arrow keys, Enter, Tab, Esc, PgUp/PgDn, / for scan)
-- Prominent sticker transmission rendering (sent & received WebP stickers)
-- Real-time offline database sync & instant message reading
-- Online server hyper-sync (Ctrl+S)
-- Transmit messages directly with optimistic rendering
-- Alien slash commands: /sticker <path>, /file <path>, /react <emoji>, /download, /help
-- Frequency filter tabs: 🌌 All, 👽 Aliens (DMs), 🛸 Fleets (Groups), 🧬 Signals (Unread)
+- Eye-Friendly Sci-Fi / Weyland-Yutani HUD Aesthetic (soft phosphor emerald #10b981, deep matte charcoal #0d1416)
+- 100% Font-Safe Universal Glyphs (zero broken tofu '▯' boxes)
+- Multimedia Support:
+  * Stickers & Images: In-terminal ANSI pixel art previews (via Pillow)
+  * Instant Viewer ('v' / 'o' / /view): Opens stickers & images in imv / xdg-open
+  * Video & Audio: Play videos and voice notes in ffplay / xdg-open ('p' / /play)
+  * Auto-download media payloads on demand
+- Full Keyboard Navigation (Arrow keys, Enter, Esc, Tab, PgUp/PgDn, / for search)
+- Filter Tabs: ALL (F1), DMS (F2), FLEET (F3), NEW (F4)
+- Live SQLite database monitoring & online hyper-sync (Ctrl+S)
+- Slash commands: /view, /play, /download, /sticker, /file, /react, /help
 """
 
 import sys
@@ -32,6 +35,12 @@ from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, Container
 from textual.widgets import OptionList, Input, Static, RichLog, Button
 from textual.widgets.option_list import Option
+
+try:
+    from PIL import Image
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
 
 
 DB_PATH = os.path.expanduser("~/.local/state/wacli/wacli.db")
@@ -90,17 +99,49 @@ def get_db():
     return conn
 
 
+def render_ansi_thumbnail(filepath: str, max_w: int = 18, max_h: int = 8) -> Optional[Text]:
+    """Render a compact true-color half-block ANSI thumbnail using Pillow."""
+    if not HAS_PILLOW or not os.path.exists(filepath):
+        return None
+    try:
+        img = Image.open(filepath).convert("RGBA")
+        img.thumbnail((max_w, max_h))
+        w, h = img.size
+        t = Text()
+        for y in range(0, h, 2):
+            t.append("    ")
+            for x in range(w):
+                r1, g1, b1, a1 = img.getpixel((x, y))
+                if y + 1 < h:
+                    r2, g2, b2, a2 = img.getpixel((x, y + 1))
+                else:
+                    r2, g2, b2, a2 = 0, 0, 0, 0
+
+                if a1 < 30 and a2 < 30:
+                    t.append(" ")
+                elif a1 < 30:
+                    t.append("▄", style=f"#{r2:02x}{g2:02x}{b2:02x}")
+                elif a2 < 30:
+                    t.append("▀", style=f"#{r1:02x}{g1:02x}{b1:02x}")
+                else:
+                    t.append("▀", style=f"#{r1:02x}{g1:02x}{b1:02x} on #{r2:02x}{g2:02x}{b2:02x}")
+            t.append("\n")
+        return t
+    except Exception:
+        return None
+
+
 class WhatsAppAlienTUI(App):
     CSS = """
     Screen {
-        background: #030706;
-        color: #d1fae5;
+        background: #0d1416;
+        color: #e2e8f0;
     }
 
     #app_header {
         height: 1;
-        background: #071a12;
-        color: #00ff88;
+        background: #111d21;
+        color: #10b981;
         dock: top;
         padding: 0 1;
         text-style: bold;
@@ -114,63 +155,68 @@ class WhatsAppAlienTUI(App):
     #sidebar {
         width: 44;
         min-width: 38;
-        max-width: 52;
+        max-width: 50;
         height: 100%;
-        background: #050f0b;
-        border-right: double #00ff66;
+        background: #10191c;
+        border-right: solid #1e3137;
     }
 
     #search_container {
         height: 3;
         padding: 0 1;
-        background: #050f0b;
+        background: #10191c;
     }
 
     #search_input {
-        background: #091f16;
+        background: #142226;
         border: none;
-        color: #00ff88;
+        color: #34d399;
         height: 1;
         padding: 0 1;
     }
 
     #search_input:focus {
-        border: tall #00ff66;
+        border: tall #10b981;
     }
 
     #filter_container {
         height: 3;
         padding: 0 1;
-        background: #050f0b;
+        background: #10191c;
         align: center middle;
     }
 
     .filter_btn {
         margin: 0 1;
         min-width: 7;
+        max-width: 9;
         height: 1;
-        background: #0b241a;
-        color: #4ade80;
+        padding: 0;
+        background: #162429;
+        color: #64748b;
         border: none;
     }
 
     .filter_btn:hover {
-        background: #00ff66;
-        color: #030706;
-        text-style: bold;
+        background: #1e3a34;
+        color: #34d399;
     }
 
     .filter_btn.-active {
-        background: #00ff66;
-        color: #030706;
+        background: #064e3b;
+        color: #34d399;
         text-style: bold;
     }
 
     #chat_list {
         height: 1fr;
-        background: #050f0b;
+        background: #10191c;
         border: none;
         padding: 0;
+        scrollbar-size-horizontal: 0;
+        scrollbar-gutter: stable;
+        scrollbar-color: #1e3137 #10191c;
+        scrollbar-color-hover: #10b981 #10191c;
     }
 
     #chat_list:focus {
@@ -180,77 +226,84 @@ class WhatsAppAlienTUI(App):
     #chat_panel {
         height: 100%;
         width: 1fr;
-        background: #030706;
+        background: #0b1013;
     }
 
     #chat_header {
         height: 3;
-        background: #071a12;
-        border-bottom: solid #00ff66;
+        background: #111d21;
+        border-bottom: solid #1e3137;
         padding: 0 1;
-        color: #00f5d4;
+        color: #38bdf8;
     }
 
     #messages_view {
         height: 1fr;
-        background: #030706;
+        background: #0b1013;
         border: none;
         padding: 1 2;
+        scrollbar-size-horizontal: 0;
+        scrollbar-gutter: stable;
+        scrollbar-color: #1e3137 #0b1013;
+        scrollbar-color-hover: #10b981 #0b1013;
     }
 
     #messages_view:focus {
-        border: round #a855f7;
+        border: round #10b981;
     }
 
     #input_area {
         height: auto;
         min-height: 4;
-        background: #071a12;
-        border-top: double #00ff66;
+        background: #111d21;
+        border-top: solid #1e3137;
         padding: 0 1;
     }
 
     #msg_input {
-        background: #0a261a;
+        background: #162429;
         border: none;
-        color: #00ff88;
+        color: #34d399;
         margin: 1 0 0 0;
     }
 
     #msg_input:focus {
-        border: tall #00ff66;
+        border: tall #10b981;
     }
 
     #input_hints {
         height: 1;
-        color: #5e8a75;
+        color: #64748b;
         padding: 0 1;
     }
 
     #status_bar {
         height: 1;
-        background: #050f0b;
-        color: #39ff14;
+        background: #10191c;
+        color: #34d399;
         padding: 0 1;
         dock: bottom;
     }
     """
 
     BINDINGS = [
-        Binding("ctrl+q", "quit", "Abort", priority=True),
-        Binding("ctrl+r", "refresh_all", "Scan", priority=True),
-        Binding("f5", "refresh_all", "Scan", priority=True),
+        Binding("ctrl+q", "quit", "Exit", priority=True),
+        Binding("ctrl+r", "refresh_all", "Refresh", priority=True),
+        Binding("f5", "refresh_all", "Refresh", priority=True),
         Binding("ctrl+s", "trigger_sync", "Hyper-Sync", priority=True),
-        Binding("slash", "focus_search", "Scan (/)", priority=False),
-        Binding("escape", "handle_escape", "Disengage", priority=True),
-        Binding("tab", "cycle_focus", "Next Sector", priority=True),
-        Binding("shift+tab", "cycle_focus_reverse", "Prev Sector", priority=True),
-        Binding("pageup", "scroll_messages_up", "Scroll Up", priority=True),
-        Binding("pagedown", "scroll_messages_down", "Scroll Down", priority=True),
+        Binding("slash", "focus_search", "Search (/)", priority=False),
+        Binding("escape", "handle_escape", "Back", priority=True),
+        Binding("tab", "cycle_focus", "Next", priority=True),
+        Binding("shift+tab", "cycle_focus_reverse", "Prev", priority=True),
+        Binding("pageup", "scroll_messages_up", "Page Up", priority=True),
+        Binding("pagedown", "scroll_messages_down", "Page Down", priority=True),
+        Binding("v", "open_latest_media", "View Media", priority=False),
+        Binding("o", "open_latest_media", "Open Media", priority=False),
+        Binding("p", "play_latest_audio", "Play Audio", priority=False),
         Binding("f1", "set_filter_all", "All", priority=False),
-        Binding("f2", "set_filter_dm", "Aliens", priority=False),
-        Binding("f3", "set_filter_group", "Fleets", priority=False),
-        Binding("f4", "set_filter_unread", "Signals", priority=False),
+        Binding("f2", "set_filter_dm", "DMs", priority=False),
+        Binding("f3", "set_filter_group", "Fleet", priority=False),
+        Binding("f4", "set_filter_unread", "New", priority=False),
     ]
 
     def __init__(self):
@@ -263,28 +316,29 @@ class WhatsAppAlienTUI(App):
         self.last_db_revision: int = 0
         self.is_syncing: bool = False
         self.last_incoming_msg_id: Optional[str] = None
+        self.last_media_item: Optional[Dict[str, Any]] = None
 
     def compose(self) -> ComposeResult:
-        yield Static(" 🛸 XENO-CLI // ALIEN COMM-LINK v2.5 👽 ── [Ctrl+S: Hyper-Sync] [F5: Re-scan] [Tab: Move] [/ : Scan Freq] [Ctrl+Q: Eject]", id="app_header", markup=False)
+        yield Static(" // WEYLAND-YUTANI // XENO-NET v3.0  ──  [Ctrl+S: Sync] [F5: Refresh] [Tab: Move] [/ : Search] [v: View Media] [Ctrl+Q: Exit]", id="app_header", markup=False)
         with Horizontal(id="main_layout"):
             with Vertical(id="sidebar"):
                 with Container(id="search_container"):
-                    yield Input(placeholder="📡 Scan alien frequencies... (Press /)", id="search_input")
+                    yield Input(placeholder="Search channels & signals... (Press /)", id="search_input")
                 with Horizontal(id="filter_container"):
-                    yield Button("🌌 All (F1)", id="btn_all", classes="filter_btn -active")
-                    yield Button("👽 Aliens (F2)", id="btn_dm", classes="filter_btn")
-                    yield Button("🛸 Fleets (F3)", id="btn_group", classes="filter_btn")
-                    yield Button("🧬 Signals (F4)", id="btn_unread", classes="filter_btn")
+                    yield Button("ALL (F1)", id="btn_all", classes="filter_btn -active")
+                    yield Button("DMS (F2)", id="btn_dm", classes="filter_btn")
+                    yield Button("FLEET (F3)", id="btn_group", classes="filter_btn")
+                    yield Button("NEW (F4)", id="btn_unread", classes="filter_btn")
                 yield OptionList(id="chat_list")
 
             with Vertical(id="chat_panel"):
-                yield Static(" [!] Select a lifeform or fleet from the sensor grid to establish comms", id="chat_header")
+                yield Static(" Select a lifeform or channel from the grid to establish comms", id="chat_header")
                 yield RichLog(id="messages_view", highlight=False, markup=True, wrap=True, auto_scroll=True)
                 with Vertical(id="input_area"):
-                    yield Input(placeholder="Lock on to an alien frequency to transmit...", id="msg_input", disabled=True)
-                    yield Static(" [Enter ↵] Transmit  |  [Esc] Release  |  [PgUp/PgDn] Log Scroll  |  /help for Xeno protocols", id="input_hints", markup=False)
+                    yield Input(placeholder="Lock onto a frequency to transmit...", id="msg_input", disabled=True)
+                    yield Static(" [Enter] Transmit  |  [Esc] Back  |  [v] View Sticker/Image/Video  |  /help for protocols", id="input_hints", markup=False)
 
-        yield Static(" 🟢 XENO-LINK // FREQUENCY: 1420.405 MHz // WARP DRIVE STANDBY", id="status_bar", markup=False)
+        yield Static(" ● ONLINE // 1420.405 MHz // WACLI STORE: OK", id="status_bar", markup=False)
 
     def on_mount(self) -> None:
         self.set_interval(1.5, self.check_live_updates)
@@ -319,7 +373,7 @@ class WhatsAppAlienTUI(App):
     def load_chats(self, preserve_selection: bool = False) -> None:
         conn = get_db()
         if not conn:
-            self.update_status("⚠️ Transceiver offline. Run 'wacli auth' to establish link.")
+            self.update_status("Transceiver offline. Run 'wacli auth' to establish link.")
             return
 
         try:
@@ -398,33 +452,32 @@ class WhatsAppAlienTUI(App):
 
                 ts_val = mts or lts
                 time_str = format_ts(ts_val)
-                icon = "🛸 " if kind == "group" else ("🌌 " if kind == "newsletter" else "👽 ")
+                icon = "▲ " if kind == "group" else ("★ " if kind == "newsletter" else "● ")
 
                 t = Text()
-                t.append(icon, style="bold #00f5d4")
-                t.append(name_clean[:22].ljust(22), style="bold #00ff88")
+                t.append(icon, style="bold #38bdf8")
+                t.append(name_clean[:22].ljust(22), style="bold #f1f5f9")
                 if unread and unread > 0:
-                    t.append(f" 🧬{unread} ", style="bold #39ff14 on #082414")
+                    t.append(f" [{unread}] ", style="bold #34d399 on #064e3b")
                 else:
                     t.append("     ")
-                t.append(f" {time_str:>8}\n", style="dim #5e8a75")
+                t.append(f" {time_str:>8}\n", style="dim #64748b")
 
-                # Format snippet with alien flair
                 snip_clean = (snippet or "").replace("\n", " ").strip()
                 if media_type == "sticker" or "sticker" in snip_clean.lower():
-                    snip_clean = "👾 [Sticker Payload]"
+                    snip_clean = "[Sticker]"
                 elif media_type == "image":
-                    snip_clean = "📷 [Hologram Image]"
+                    snip_clean = "[Image]"
                 elif media_type == "audio":
-                    snip_clean = "🎙️ [Sonic Intercept]"
+                    snip_clean = "[Audio Recording]"
                 elif media_type == "video":
-                    snip_clean = "🎥 [Visual Feed]"
+                    snip_clean = "[Video Stream]"
                 elif media_type == "document":
-                    snip_clean = "📄 [Data Archive]"
+                    snip_clean = "[Data Archive]"
                 elif not snip_clean:
-                    snip_clean = "(quarantine empty)"
+                    snip_clean = "(empty)"
 
-                t.append(f"  {snip_clean[:32]}", style="dim #4ade80")
+                t.append(f"  {snip_clean[:32]}", style="dim #94a3b8")
 
                 options.append(Option(t, id=jid))
                 self.chats_data.append({
@@ -445,7 +498,7 @@ class WhatsAppAlienTUI(App):
                     first_chat = self.chats_data[0]
                     self.load_messages(first_chat["jid"], first_chat["name"])
             else:
-                self.update_status("⚠️ No alien frequencies match your sensor query.")
+                self.update_status("No channels match your sensor query.")
 
         except Exception as e:
             self.update_status(f"Sensor error: {e}")
@@ -504,7 +557,6 @@ class WhatsAppAlienTUI(App):
         self.load_messages(chat_jid, chat_name)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        # User pressed Enter on chat -> lock on and focus transmitter
         msg_input = self.query_one("#msg_input", Input)
         msg_input.focus()
 
@@ -514,17 +566,18 @@ class WhatsAppAlienTUI(App):
 
         self.current_chat_jid = chat_jid
         self.current_chat_name = chat_name
+        self.last_media_item = None
 
         header = self.query_one("#chat_header", Static)
         header_text = Text()
-        header_text.append(" 🛸 COMMS LOCKED: ", style="dim #39ff14")
-        header_text.append(f"{chat_name} ", style="bold #00ff88")
-        header_text.append(f"// CHANNEL: {chat_jid}", style="dim #00f5d4")
+        header_text.append(" [●] CHANNEL LOCKED: ", style="bold #10b981")
+        header_text.append(f"{chat_name} ", style="bold #f1f5f9")
+        header_text.append(f"// {chat_jid}", style="dim #64748b")
         header.update(header_text)
 
         msg_input = self.query_one("#msg_input", Input)
         msg_input.disabled = False
-        msg_input.placeholder = f"🛸 Transmit to {chat_name}... (Enter to broadcast, Esc to disengage)"
+        msg_input.placeholder = f"Transmit message to {chat_name}... (Enter to broadcast, Esc to disengage)"
 
         conn = get_db()
         if not conn:
@@ -536,11 +589,11 @@ class WhatsAppAlienTUI(App):
             SELECT * FROM (
                 SELECT 
                     m.rowid, m.msg_id, 
-                    COALESCE(NULLIF(m.sender_name, ''), NULLIF(co.full_name, ''), NULLIF(co.push_name, ''), NULLIF(co.phone, ''), m.sender_jid, 'Alien Lifeform') AS sender_display,
+                    COALESCE(NULLIF(m.sender_name, ''), NULLIF(co.full_name, ''), NULLIF(co.push_name, ''), NULLIF(co.phone, ''), m.sender_jid, 'Contact') AS sender_display,
                     m.from_me, m.ts, 
                     COALESCE(NULLIF(m.text, ''), m.display_text, '') AS body,
                     m.media_type, m.media_caption, m.reaction_emoji, m.quoted_msg_id,
-                    m.local_path
+                    m.local_path, m.filename
                 FROM messages m
                 LEFT JOIN contacts co ON m.sender_jid = co.jid
                 WHERE m.chat_jid = ?
@@ -556,86 +609,141 @@ class WhatsAppAlienTUI(App):
             log.clear()
 
             if not rows:
-                empty_text = Text("\n  🌌 No orbital transmissions recorded in this sector. Initiate first broadcast below!\n", style="dim italic #4ade80")
+                empty_text = Text("\n  No transmissions recorded in this channel. Send the first message below!\n", style="dim italic #64748b")
                 log.write(empty_text)
                 return
 
             last_date_str = ""
             for row in rows:
-                rowid, msg_id, sender_name, from_me, ts, body, media_type, caption, reaction, quote, local_path = row
+                rowid, msg_id, sender_name, from_me, ts, body, media_type, caption, reaction, quote, local_path, filename = row
                 if not from_me:
                     self.last_incoming_msg_id = msg_id
+
+                if media_type:
+                    self.last_media_item = {
+                        "msg_id": msg_id,
+                        "chat_jid": chat_jid,
+                        "media_type": media_type,
+                        "local_path": local_path,
+                        "filename": filename
+                    }
 
                 date_str = format_date_header(ts)
                 if date_str != last_date_str:
                     last_date_str = date_str
                     div = Text()
-                    div.append(f"\n───────────── 🛸 {date_str} // SECTOR 4 ─────────────\n", style="bold #5e8a75")
+                    div.append(f"\n─── [ {date_str} ] ───\n", style="bold #475569")
                     log.write(div)
 
                 time_str = format_time_only(ts)
                 t = Text()
 
-                # Check if this is a sticker transmission
                 is_sticker = (media_type == "sticker") or (body and "Sent sticker" in body)
+                is_image = (media_type == "image")
+                is_video = (media_type == "video")
+                is_audio = (media_type == "audio")
+                is_doc = (media_type == "document")
 
                 if from_me:
-                    t.append(f"[{time_str}] ", style="dim #00ff88")
-                    t.append("🛸 YOU (COMMANDER)", style="bold #39ff14")
+                    t.append(f"[{time_str}] ", style="dim #64748b")
+                    t.append(">>> YOU", style="bold #34d399")
                     t.append("\n")
 
-                    if is_sticker:
-                        # RENDER PROMINENT ALIEN STICKER PAYLOAD
-                        t.append("   ╭──────────────────────────────╮\n", style="#a855f7")
-                        t.append("   │        👾  ( ⊙ _ ⊙ )  🛸      │\n", style="bold #00ff88")
-                        t.append("   │    [ STICKER TRANSMISSION ]  │\n", style="bold #39ff14")
-                        if local_path:
-                            t.append(f"   │  📁 {os.path.basename(local_path)[:22]:<22}  │\n", style="dim #00f5d4")
-                        t.append("   ╰──────────────────────────────╯", style="#a855f7")
-                        t.append(" 🧬✓✓\n", style="bold #00f5d4")
-                    else:
-                        if media_type:
-                            m_icon = "📷" if media_type == "image" else ("📄" if media_type == "document" else "🎙️")
-                            t.append(f"  [{m_icon} PAYLOAD: {media_type.upper()}] ", style="italic #00ff88")
+                    if is_sticker or is_image:
+                        # Try ANSI pixel art thumbnail
+                        thumb = None
+                        if local_path and os.path.exists(local_path):
+                            thumb = render_ansi_thumbnail(local_path, max_w=20, max_h=8)
+                        
+                        tag = "STICKER" if is_sticker else "IMAGE"
+                        t.append(f"   ┌── [ {tag} TRANSMISSION ] ────────────────┐\n", style="#059669")
+                        if thumb:
+                            t.append(thumb)
+                        t.append(f"   │  [Press 'v' to view in imv]                │\n", style="dim #34d399")
+                        t.append(f"   └────────────────────────────────────────────┘", style="#059669")
+                        t.append(" ✓✓\n", style="#38bdf8")
 
+                    elif is_video:
+                        v_name = filename or "video.mp4"
+                        t.append(f"   ┌── [ VIDEO STREAM: {v_name} ] ──┐\n", style="#059669")
+                        t.append(f"   │  [Press 'v' to play in ffplay]             │\n", style="dim #34d399")
+                        t.append(f"   └────────────────────────────────────────────┘", style="#059669")
+                        t.append(" ✓✓\n", style="#38bdf8")
+
+                    elif is_audio:
+                        a_name = filename or "audio_note"
+                        t.append(f"   ┌── [ AUDIO RECORDING: {a_name} ] ──┐\n", style="#059669")
+                        t.append(f"   │  [Press 'p' to play audio in ffplay]       │\n", style="dim #34d399")
+                        t.append(f"   └────────────────────────────────────────────┘", style="#059669")
+                        t.append(" ✓✓\n", style="#38bdf8")
+
+                    elif is_doc:
+                        d_name = filename or "document"
+                        t.append(f"   ┌── [ DATA ARCHIVE: {d_name} ] ──┐\n", style="#059669")
+                        t.append(f"   │  [Press 'v' to open archive]               │\n", style="dim #34d399")
+                        t.append(f"   └────────────────────────────────────────────┘", style="#059669")
+                        t.append(" ✓✓\n", style="#38bdf8")
+
+                    else:
                         msg_content = body or caption or ""
                         t.append("  ")
-                        t.append(f"  {msg_content}  ", style="on #00381e bold #00ff88")
-                        t.append(" 🧬✓✓\n", style="bold #00f5d4")
+                        t.append(f"  {msg_content}  ", style="on #064e3b #d1fae5")
+                        t.append(" ✓✓\n", style="#38bdf8")
 
                 else:
-                    t.append(f"[{time_str}] ", style="dim #00f5d4")
-                    s_clean = sender_name or "Alien Lifeform"
+                    t.append(f"[{time_str}] ", style="dim #64748b")
+                    s_clean = sender_name or "Contact"
                     if s_clean.endswith("@s.whatsapp.net"):
                         s_clean = "+" + s_clean.split("@")[0]
-                    t.append(f"👽 {s_clean}", style="bold #00f5d4")
+                    t.append(f"<<< {s_clean}", style="bold #38bdf8")
                     t.append("\n")
 
-                    if is_sticker:
-                        # RENDER PROMINENT ALIEN STICKER PAYLOAD
-                        t.append("   ╭──────────────────────────────╮\n", style="#a855f7")
-                        t.append("   │        👾  ( ⊙ _ ⊙ )  🛸      │\n", style="bold #00f5d4")
-                        t.append("   │    [ INCOMING STICKER ]      │\n", style="bold #00ff88")
-                        if local_path:
-                            t.append(f"   │  📁 {os.path.basename(local_path)[:22]:<22}  │\n", style="dim #00f5d4")
-                        t.append("   ╰──────────────────────────────╯\n", style="#a855f7")
-                    else:
-                        if media_type:
-                            m_icon = "📷" if media_type == "image" else ("📄" if media_type == "document" else "🎙️")
-                            t.append(f"  [{m_icon} PAYLOAD: {media_type.upper()}] ", style="italic #00f5d4")
+                    if is_sticker or is_image:
+                        thumb = None
+                        if local_path and os.path.exists(local_path):
+                            thumb = render_ansi_thumbnail(local_path, max_w=20, max_h=8)
+                        
+                        tag = "STICKER" if is_sticker else "IMAGE"
+                        t.append(f"   ┌── [ INCOMING {tag} ] ─────────────────────┐\n", style="#1e3a47")
+                        if thumb:
+                            t.append(thumb)
+                        elif not local_path:
+                            t.append(f"   │  [Uncached: Press 'v' to download & view]  │\n", style="italic #94a3b8")
+                        else:
+                            t.append(f"   │  [Press 'v' to view in imv]                │\n", style="dim #38bdf8")
+                        t.append(f"   └────────────────────────────────────────────┘\n", style="#1e3a47")
 
+                    elif is_video:
+                        v_name = filename or "video.mp4"
+                        t.append(f"   ┌── [ INCOMING VIDEO: {v_name} ] ──┐\n", style="#1e3a47")
+                        t.append(f"   │  [Press 'v' to play in ffplay]             │\n", style="dim #38bdf8")
+                        t.append(f"   └────────────────────────────────────────────┘\n", style="#1e3a47")
+
+                    elif is_audio:
+                        a_name = filename or "audio_note"
+                        t.append(f"   ┌── [ INCOMING AUDIO: {a_name} ] ──┐\n", style="#1e3a47")
+                        t.append(f"   │  [Press 'p' to play audio in ffplay]       │\n", style="dim #38bdf8")
+                        t.append(f"   └────────────────────────────────────────────┘\n", style="#1e3a47")
+
+                    elif is_doc:
+                        d_name = filename or "document"
+                        t.append(f"   ┌── [ INCOMING ARCHIVE: {d_name} ] ──┐\n", style="#1e3a47")
+                        t.append(f"   │  [Press 'v' to open archive]               │\n", style="dim #38bdf8")
+                        t.append(f"   └────────────────────────────────────────────┘\n", style="#1e3a47")
+
+                    else:
                         msg_content = body or caption or ""
                         t.append("  ")
-                        t.append(f"  {msg_content}  ", style="on #08261e #d1fae5")
+                        t.append(f"  {msg_content}  ", style="on #1e293b #f1f5f9")
                         t.append("\n")
 
                 if reaction:
-                    t.append(f"     🧬 Orbital Reaction: {reaction}\n", style="dim #39ff14")
+                    t.append(f"     Reacted: {reaction}\n", style="dim #34d399")
 
                 log.write(t)
 
         except Exception as e:
-            self.update_status(f"Transceiver reading error: {e}")
+            self.update_status(f"Error reading messages: {e}")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         if event.input.id == "msg_input":
@@ -643,33 +751,46 @@ class WhatsAppAlienTUI(App):
             if not raw_text:
                 return
             if not self.current_chat_jid:
-                self.update_status("⚠️ Lock on to a target lifeform first!")
+                self.update_status("Select a target channel first.")
                 return
 
             event.input.value = ""
 
-            # Check slash commands
             if raw_text == "/help":
                 log = self.query_one("#messages_view", RichLog)
                 help_text = Text()
-                help_text.append("\n── 🛸 XENO-CLI COMM PROTOCOLS ──\n", style="bold #00ff88")
+                help_text.append("\n── 💡 WEYLAND COMM PROTOCOLS ──\n", style="bold #10b981")
                 help_text.append(" • Standard text      : Type message and press Enter to broadcast.\n", style="white")
-                help_text.append(" • /sticker <file>    : Transmit a WebP sticker to target lifeform\n", style="bold #a855f7")
-                help_text.append(" • /file <path>       : Beam an image, video, audio, or document archive\n", style="#00f5d4")
-                help_text.append(" • /react <emoji>     : Transmit orbital reaction to last signal\n", style="#00f5d4")
-                help_text.append(" • /download          : Download incoming media payload from last signal\n", style="#39ff14")
-                help_text.append(" • Ctrl+S             : Engage hyper-sync with WhatsApp servers\n", style="#39ff14")
-                help_text.append(" • Ctrl+R / F5        : Re-scan local sensor database\n", style="#39ff14")
-                help_text.append(" • Esc                : Disengage transmitter / return to sensor grid\n", style="yellow")
-                help_text.append(" • PageUp / PgDn      : Scroll orbital transmission log\n", style="yellow")
-                help_text.append("────────────────────────────────\n", style="dim #5e8a75")
+                help_text.append(" • /view or /open     : Open latest sticker/image in imv, video in ffplay\n", style="#38bdf8")
+                help_text.append(" • /play              : Play latest audio recording in ffplay\n", style="#38bdf8")
+                help_text.append(" • /download          : Download media payload from latest signal\n", style="#34d399")
+                help_text.append(" • /sticker <file>    : Send a WebP sticker\n", style="#a78bfa")
+                help_text.append(" • /file <path>       : Send an image, video, audio, or document archive\n", style="#38bdf8")
+                help_text.append(" • /react <emoji>     : Transmit reaction to last signal\n", style="#34d399")
+                help_text.append(" • Hotkeys            : 'v' View Media, 'p' Play Audio, 'F5' Scan, 'Ctrl+S' Sync\n", style="yellow")
+                help_text.append("───────────────────────────────\n", style="dim #64748b")
                 log.write(help_text)
+                return
+
+            if raw_text in ("/view", "/open"):
+                self.action_open_latest_media()
+                return
+
+            if raw_text == "/play":
+                self.action_play_latest_audio()
+                return
+
+            if raw_text == "/download":
+                if not self.last_media_item:
+                    self.update_status("No media payload detected in current channel.")
+                    return
+                self.download_media_async(self.last_media_item["chat_jid"], self.last_media_item["msg_id"])
                 return
 
             if raw_text.startswith("/sticker "):
                 sticker_path = os.path.expanduser(raw_text[9:].strip())
                 if not os.path.exists(sticker_path):
-                    self.update_status(f"❌ WebP sticker payload not found: {sticker_path}")
+                    self.update_status(f"File not found: {sticker_path}")
                     return
                 self.update_status(f"Transmitting WebP sticker {os.path.basename(sticker_path)}...")
                 self.send_sticker_async(self.current_chat_jid, self.current_chat_name, sticker_path)
@@ -678,46 +799,99 @@ class WhatsAppAlienTUI(App):
             if raw_text.startswith("/file "):
                 file_path = os.path.expanduser(raw_text[6:].strip())
                 if not os.path.exists(file_path):
-                    self.update_status(f"❌ Archive not found: {file_path}")
+                    self.update_status(f"File not found: {file_path}")
                     return
-                self.update_status(f"Beaming archive {os.path.basename(file_path)}...")
+                self.update_status(f"Sending file {os.path.basename(file_path)}...")
                 self.send_file_async(self.current_chat_jid, self.current_chat_name, file_path)
                 return
 
             if raw_text.startswith("/react "):
                 emoji = raw_text[7:].strip()
                 if not self.last_incoming_msg_id:
-                    self.update_status("❌ No previous alien signal detected to react to.")
+                    self.update_status("No signal detected to react to.")
                     return
                 self.update_status(f"Transmitting reaction {emoji}...")
                 self.send_reaction_async(self.current_chat_jid, self.last_incoming_msg_id, emoji)
-                return
-
-            if raw_text == "/download":
-                if not self.last_incoming_msg_id:
-                    self.update_status("❌ No previous media payload detected.")
-                    return
-                self.update_status("Downloading media payload from target lifeform...")
-                self.download_media_async(self.current_chat_jid, self.last_incoming_msg_id)
                 return
 
             # Regular broadcast:
             log = self.query_one("#messages_view", RichLog)
             time_now = datetime.datetime.now().strftime("%I:%M %p")
             opt_text = Text()
-            opt_text.append(f"[{time_now}] ", style="dim #00ff88")
-            opt_text.append("🛸 YOU (COMMANDER)", style="bold #39ff14")
+            opt_text.append(f"[{time_now}] ", style="dim #64748b")
+            opt_text.append(">>> YOU", style="bold #34d399")
             opt_text.append("\n  ")
-            opt_text.append(f"  {raw_text}  ", style="on #00381e bold #00ff88")
-            opt_text.append("  🧬 Broadcasting...\n", style="dim #39ff14")
+            opt_text.append(f"  {raw_text}  ", style="on #064e3b #d1fae5")
+            opt_text.append("  Sending...\n", style="dim #34d399")
             log.write(opt_text)
 
-            self.update_status(f"Broadcasting to {self.current_chat_name}...")
+            self.update_status(f"Transmitting to {self.current_chat_name}...")
             self.send_message_async(self.current_chat_jid, self.current_chat_name, raw_text)
 
         elif event.input.id == "search_input":
             chat_list = self.query_one("#chat_list", OptionList)
             chat_list.focus()
+
+    def action_open_latest_media(self) -> None:
+        if not self.last_media_item:
+            self.update_status("No media payload in current channel.")
+            return
+        m = self.last_media_item
+        self.open_media_worker(m["chat_jid"], m["msg_id"], m.get("local_path"), m.get("media_type"))
+
+    def action_play_latest_audio(self) -> None:
+        if not self.last_media_item:
+            self.update_status("No audio payload in current channel.")
+            return
+        m = self.last_media_item
+        self.open_media_worker(m["chat_jid"], m["msg_id"], m.get("local_path"), "audio")
+
+    @work(thread=True)
+    def open_media_worker(self, chat_jid: str, msg_id: str, local_path: Optional[str], media_type: Optional[str]) -> None:
+        path = local_path
+        if not path or not os.path.exists(path):
+            self.call_from_thread(lambda: self.update_status("Downloading media payload..."))
+            cmd = ["wacli", "media", "download", "--chat", chat_jid, "--id", msg_id]
+            res = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            if res.returncode == 0:
+                for line in res.stdout.splitlines():
+                    if "(" in line and ")" in line:
+                        potential_path = line.split("(")[0].strip()
+                        if os.path.exists(potential_path):
+                            path = potential_path
+                            break
+
+        if path and os.path.exists(path):
+            self.call_from_thread(lambda: self.update_status(f"Opening {os.path.basename(path)}..."))
+            try:
+                if media_type in ("video", "audio"):
+                    subprocess.Popen(["ffplay", "-autoexit", "-loglevel", "quiet", path])
+                else:
+                    subprocess.Popen(["imv", path])
+            except Exception:
+                subprocess.Popen(["xdg-open", path])
+        else:
+            self.call_from_thread(lambda: self.update_status("Could not locate or download media file."))
+
+    @work(thread=True)
+    def download_media_async(self, chat_jid: str, msg_id: str) -> None:
+        try:
+            cmd = [
+                "wacli", "media", "download",
+                "--lock-wait", "15s",
+                "--chat", chat_jid,
+                "--id", msg_id
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            def on_complete():
+                if proc.returncode == 0:
+                    self.update_status("Media payload downloaded successfully!")
+                    self.check_live_updates()
+                else:
+                    self.update_status(f"Download failed: {proc.stderr or proc.stdout}")
+            self.call_from_thread(on_complete)
+        except Exception as e:
+            self.call_from_thread(lambda: self.update_status(f"Download error: {e}"))
 
     @work(thread=True)
     def send_message_async(self, chat_jid: str, chat_name: str, message_text: str) -> None:
@@ -744,17 +918,17 @@ class WhatsAppAlienTUI(App):
 
             def on_complete():
                 if success:
-                    self.update_status(f"🟢 Signal confirmed by {chat_name}!")
+                    self.update_status(f"Signal confirmed by {chat_name}!")
                     self.check_live_updates()
                 else:
-                    self.update_status(f"❌ Transmission failed: {error_msg}")
+                    self.update_status(f"Transmission failed: {error_msg}")
 
             self.call_from_thread(on_complete)
 
         except subprocess.TimeoutExpired:
-            self.call_from_thread(lambda: self.update_status("❌ Hyper-relay timed out (30s)."))
+            self.call_from_thread(lambda: self.update_status("Relay timed out (30s)."))
         except Exception as e:
-            self.call_from_thread(lambda: self.update_status(f"❌ Transmission error: {e}"))
+            self.call_from_thread(lambda: self.update_status(f"Transmission error: {e}"))
 
     @work(thread=True)
     def send_sticker_async(self, chat_jid: str, chat_name: str, sticker_path: str) -> None:
@@ -780,14 +954,14 @@ class WhatsAppAlienTUI(App):
 
             def on_complete():
                 if success:
-                    self.update_status(f"👾 Sticker payload delivered to {chat_name}!")
+                    self.update_status(f"Sticker delivered to {chat_name}!")
                     self.check_live_updates()
                 else:
-                    self.update_status(f"❌ Sticker transmission failed: {error_msg}")
+                    self.update_status(f"Sticker failed: {error_msg}")
 
             self.call_from_thread(on_complete)
         except Exception as e:
-            self.call_from_thread(lambda: self.update_status(f"❌ Sticker error: {e}"))
+            self.call_from_thread(lambda: self.update_status(f"Sticker error: {e}"))
 
     @work(thread=True)
     def send_file_async(self, chat_jid: str, chat_name: str, file_path: str) -> None:
@@ -813,14 +987,14 @@ class WhatsAppAlienTUI(App):
 
             def on_complete():
                 if success:
-                    self.update_status(f"✓ Archive beamed to {chat_name}!")
+                    self.update_status(f"File beamed to {chat_name}!")
                     self.check_live_updates()
                 else:
-                    self.update_status(f"❌ Beam failed: {error_msg}")
+                    self.update_status(f"Beam failed: {error_msg}")
 
             self.call_from_thread(on_complete)
         except Exception as e:
-            self.call_from_thread(lambda: self.update_status(f"❌ Archive beam error: {e}"))
+            self.call_from_thread(lambda: self.update_status(f"File send error: {e}"))
 
     @work(thread=True)
     def send_reaction_async(self, chat_jid: str, msg_id: str, emoji: str) -> None:
@@ -835,48 +1009,28 @@ class WhatsAppAlienTUI(App):
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
             def on_complete():
                 if proc.returncode == 0:
-                    self.update_status(f"🧬 Reaction {emoji} acknowledged!")
+                    self.update_status(f"Reaction {emoji} acknowledged!")
                     self.check_live_updates()
                 else:
-                    self.update_status("❌ Reaction transmission failed.")
+                    self.update_status("Reaction failed.")
 
             self.call_from_thread(on_complete)
         except Exception as e:
-            self.call_from_thread(lambda: self.update_status(f"❌ Reaction error: {e}"))
-
-    @work(thread=True)
-    def download_media_async(self, chat_jid: str, msg_id: str) -> None:
-        try:
-            cmd = [
-                "wacli", "media", "download",
-                "--lock-wait", "15s",
-                "--chat", chat_jid,
-                "--id", msg_id
-            ]
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-            def on_complete():
-                if proc.returncode == 0:
-                    self.update_status("✓ Media payload downloaded to local store!")
-                    self.check_live_updates()
-                else:
-                    self.update_status(f"❌ Download failed: {proc.stderr or proc.stdout}")
-            self.call_from_thread(on_complete)
-        except Exception as e:
-            self.call_from_thread(lambda: self.update_status(f"❌ Download error: {e}"))
+            self.call_from_thread(lambda: self.update_status(f"Reaction error: {e}"))
 
     @work(thread=True)
     def run_sync_online(self) -> None:
         if self.is_syncing:
             return
         self.is_syncing = True
-        self.call_from_thread(lambda: self.update_status("🔄 Engaging Hyper-Sync with orbital relays..."))
+        self.call_from_thread(lambda: self.update_status("Engaging Hyper-Sync with servers..."))
 
         try:
             cmd = ["wacli", "sync", "--once", "--idle-exit", "2s"]
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             def on_finish():
                 self.is_syncing = False
-                self.update_status("🟢 Hyper-Sync complete! Sensor grid refreshed.")
+                self.update_status("Hyper-Sync complete! Grid refreshed.")
                 self.load_chats(preserve_selection=True)
                 if self.current_chat_jid:
                     self.load_messages(self.current_chat_jid, self.current_chat_name, force_reload=True)
@@ -885,14 +1039,14 @@ class WhatsAppAlienTUI(App):
         except Exception as e:
             def on_err():
                 self.is_syncing = False
-                self.update_status(f"⚠️ Hyper-Sync aborted: {e}")
+                self.update_status(f"Hyper-Sync ended: {e}")
             self.call_from_thread(on_err)
 
     def action_trigger_sync(self) -> None:
         self.run_sync_online()
 
     def action_refresh_all(self) -> None:
-        self.update_status("Re-scanning local sensor telemetry...")
+        self.update_status("Re-scanning local sensor database...")
         self.load_chats(preserve_selection=True)
         if self.current_chat_jid:
             self.load_messages(self.current_chat_jid, self.current_chat_name, force_reload=True)

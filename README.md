@@ -1,57 +1,53 @@
-# 🛸 wacli-tui // XENO-CLI 👽
-> **Extraterrestrial, keyboard-navigable WhatsApp Terminal User Interface powered by `wacli`.**
+# 🛸 wacli-tui // XENO-NET 👽
+> **Eye-friendly Alien / Weyland-Yutani Sci-Fi WhatsApp Terminal Client with True Multimedia Support.**
 
 ```
-   🛸  ______________________________________________________  🛸
-      /                                                      \
-     |     __      __  _____   _________ .____    .___       |
-     |    /  \    /  \/  _  \  \_   ___ \|    |   |   |      |
-     |    \   \/\/   /  /_\  \ /    \  \/|    |   |   |      |
-     |     \        /    |    \\     \___|    |___|   |      |
-     |      \__/\  /\____|__  / \______  /_______ \___|      |
-     |           \/         \/         \/        \/          |
-     |          [ XENO-NET // ALIEN TERMINAL v2.5 ]          |
-      \______________________________________________________/
+   //========================================================\\
+  ||     __      __  _____   _________ .____    .___          ||
+  ||    /  \    /  \/  _  \  \_   ___ \|    |   |   |         ||
+  ||    \   \/\/   /  /_\  \ /    \  \/|    |   |   |         ||
+  ||     \        /    |    \\     \___|    |___|   |         ||
+  ||      \__/\  /\____|__  / \______  /_______ \___|         ||
+  ||           \/         \/         \/        \/             ||
+  ||        [ WEYLAND-YUTANI // XENO-NET TERMINAL v3.0 ]      ||
+   \\========================================================//
 ```
 
-`wacli-tui` turns WhatsApp into an alien sci-fi cyberpunk terminal client. It hooks into [wacli](https://github.com/openclaw/wacli) to provide instant offline browsing, keyboard-driven navigation, real-time message syncing, WebP sticker rendering, and live text transmission without leaving your terminal shell.
+`wacli-tui` is an eye-friendly, alien sci-fi terminal client for WhatsApp powered by [wacli](https://github.com/openclaw/wacli). It provides full multimedia viewing (stickers, images, videos, audio, emojis), keyboard-driven navigation, in-terminal pixel art previews, and live messaging.
 
 ---
 
-## ⚡ Key Features
+## ⚡ Key Highlights
 
-* **👽 Alien / Sci-Fi Cyberpunk Aesthetics:** Deep space void background (`#030706`), neon slime green accents (`#00ff88` / `#39ff14`), bioluminescent cyan highlights (`#00f5d4`), and mothership terminal borders.
-* **👾 Prominent Sticker Transmissions:** Sent and received WhatsApp stickers (WebP payloads) are rendered prominently in terminal sticker transmission pods with file details and status.
-* **⌨️ Full Keyboard Navigation:**
-  * Move up & down chats with <kbd>↑</kbd> / <kbd>↓</kbd> while immediately previewing messages on the right.
+* **👁️ Soothing, Eye-Friendly Sci-Fi Palette:**
+  * Deep matte charcoal/slate background (`#0d1416`), zero glaring harsh neon contrast.
+  * Soft phosphor emerald (`#10b981` / `#34d399`) and ice cyan (`#38bdf8`) accents.
+  * 100% font-safe universal glyphs (`●`, `▲`, `★`, `✓✓`) — **zero broken tofu boxes (`▯`)**.
+* **🖼️ True Multimedia Support:**
+  * **Stickers & Images:** Automatic in-terminal ANSI pixel art previews powered by Pillow.
+  * **Instant Viewer (<kbd>v</kbd> / <kbd>o</kbd>):** Opens stickers, photos, and GIFs in `imv` (or default viewer).
+  * **Videos (<kbd>v</kbd>):** Launches video streams in `ffplay` / `xdg-open`.
+  * **Voice & Audio (<kbd>p</kbd>):** One-touch audio playback in `ffplay`.
+  * **Emojis:** Native color emojis supported across all messages via `noto-fonts-emoji`.
+* **⌨️ Seamless Keyboard Control:**
+  * Move up & down chats with <kbd>↑</kbd> / <kbd>↓</kbd> (instant preview on right).
   * Press <kbd>Enter ↵</kbd> on a chat to jump directly into the transmitter to type.
-  * Press <kbd>Enter ↵</kbd> in the input box to broadcast messages with optimistic real-time rendering.
-  * Press <kbd>Esc</kbd> to disengage transmitter and return to chat selection.
-  * Jump straight to frequency search with <kbd>/</kbd>.
-  * Cycle sectors seamlessly with <kbd>Tab</kbd> and <kbd>Shift</kbd>+<kbd>Tab</kbd>.
-* **📡 Frequency Filter Tabs:**
-  * `🌌 All (F1)` — All conversations
-  * `👽 Aliens (F2)` — Direct messages (1-on-1)
-  * `🛸 Fleets (F3)` — Groups
-  * `🧬 Signals (F4)` — Unread messages with signal counters
-* **⚡ Live Offline & Online Syncing:**
-  * Instant offline loading (2–4ms SQLite reads with WAL concurrency).
-  * Auto-detects new incoming messages from `wacli sync`.
-  * Trigger manual server sync anytime with <kbd>Ctrl</kbd> + <kbd>S</kbd>.
-* **🚀 In-App Slash Commands:**
-  * `/sticker <path.webp>` — Send a WebP sticker
-  * `/file <path>` — Beam an image, video, audio, or document archive
-  * `/react <emoji>` — Transmit orbital reaction to the last signal
-  * `/download` — Download media payload from the last transmission
-  * `/help` — Display Xeno-CLI comm protocols
+  * Press <kbd>Enter ↵</kbd> in input to send messages with real-time optimistic rendering.
+  * Press <kbd>Esc</kbd> to return to chat selection.
+  * Press <kbd>/</kbd> to search channels & contacts.
+  * Compact filter tabs that fit perfectly: `ALL (F1)`, `DMS (F2)`, `FLEET (F3)`, `NEW (F4)`.
+* **📡 Live Syncing:**
+  * Blazing fast 2–4ms SQLite reads with WAL concurrency.
+  * Instant auto-detection of incoming WhatsApp messages.
+  * Online Hyper-Sync with <kbd>Ctrl</kbd> + <kbd>S</kbd>.
 
 ---
 
 ## 📦 Requirements
 
-* **Python 3.9+**
+* **Python 3.9+** (with `textual`, `rich`, and `Pillow`)
 * **wacli** (WhatsApp CLI: `yay -S wacli-bin` or `brew install openclaw/tap/wacli`)
-* Python libraries: `textual>=8.0.0`, `rich>=13.0.0`
+* Media Viewers (optional but recommended): `imv`, `ffplay` / `ffmpeg`, `noto-fonts-emoji`
 
 ---
 
@@ -63,7 +59,7 @@ wacli auth
 wacli sync --once
 ```
 
-### 2. Launch wacli-tui
+### 2. Launch
 ```bash
 wacli-tui
 ```
@@ -74,27 +70,31 @@ wacli-tui
 
 | Shortcut | Function |
 | :--- | :--- |
-| <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate contacts / fleets on the sensor grid |
-| <kbd>Enter ↵</kbd> on Chat | Lock onto chat and **focus message transmitter** |
-| <kbd>Enter ↵</kbd> in Input | **Broadcast / Send** typed message |
-| <kbd>Esc</kbd> | Disengage input / search and return to chat list |
-| <kbd>/</kbd> | Jump to frequency scan / search bar |
-| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | Cycle through Search, Chat Grid, Log View, and Transmitter |
-| <kbd>PgUp</kbd> / <kbd>PgDn</kbd> | Scroll transmission log |
-| <kbd>F1</kbd> – <kbd>F4</kbd> | Switch frequency filters (`All`, `Aliens`, `Fleets`, `Signals`) |
-| <kbd>Ctrl</kbd> + <kbd>S</kbd> | Engage Hyper-Sync with WhatsApp servers |
-| <kbd>Ctrl</kbd> + <kbd>R</kbd> / <kbd>F5</kbd> | Re-scan local sensor database |
-| <kbd>Ctrl</kbd> + <kbd>Q</kbd> | Eject / Abort session cleanly |
+| <kbd>↑</kbd> / <kbd>↓</kbd> | Navigate channels on the grid (instant preview) |
+| <kbd>Enter ↵</kbd> on Chat | Select chat and focus message transmitter |
+| <kbd>Enter ↵</kbd> in Input | Transmit / Send typed message |
+| <kbd>v</kbd> or <kbd>o</kbd> | **View/Open** latest sticker, image, or video in external viewer |
+| <kbd>p</kbd> | **Play** latest audio recording / voice note |
+| <kbd>Esc</kbd> | Disengage transmitter and return to chat list |
+| <kbd>/</kbd> | Jump to search bar |
+| <kbd>Tab</kbd> / <kbd>Shift</kbd>+<kbd>Tab</kbd> | Cycle focus between Search, Chat List, Log, and Transmitter |
+| <kbd>PgUp</kbd> / <kbd>PgDn</kbd> | Scroll transmission history |
+| <kbd>F1</kbd> – <kbd>F4</kbd> | Switch filters (`ALL`, `DMS`, `FLEET`, `NEW`) |
+| <kbd>Ctrl</kbd> + <kbd>S</kbd> | Hyper-Sync with WhatsApp servers |
+| <kbd>Ctrl</kbd> + <kbd>R</kbd> / <kbd>F5</kbd> | Re-scan local database |
+| <kbd>Ctrl</kbd> + <kbd>Q</kbd> | Exit application cleanly |
 
 ---
 
 ## 🛠️ Slash Commands
 
 Type these directly into the message input bar:
-* `/sticker /path/to/sticker.webp` — Send a sticker to current contact.
-* `/file /path/to/image.png` — Send a photo, video, audio, or PDF document.
+* `/view` or `/open` — View latest sticker/image in `imv`, video in `ffplay`.
+* `/play` — Play latest audio/voice note in `ffplay`.
+* `/download` — Force download media payload for the current message.
+* `/sticker /path/to/sticker.webp` — Send a WebP sticker.
+* `/file /path/to/media.jpg` — Send a photo, video, audio, or document archive.
 * `/react 👍` — React to the last incoming message.
-* `/download` — Download media from the latest transmission.
 * `/help` — Print command guide.
 
 ---
