@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wacli-tui"
+version = "0.1.0"
+description = "Extraterrestrial / Alien-themed WhatsApp Terminal User Interface powered by wacli"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "venkatengineer", email = "venkatbadhri2912@gmail.com"}
+]
+keywords = ["whatsapp", "cli", "tui", "terminal", "wacli", "textual", "alien"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Topic :: Communications :: Chat",
+]
+dependencies = [
+    "textual>=8.0.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+wacli-tui = "wacli_tui:main"
